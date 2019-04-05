@@ -40,14 +40,22 @@ OBJS := $(C_SRC:%=$(BUILD_DIR)/%.o)
 #OBJS := $(ALL_SRC_F:%=$(BUILD_DIR)/%.o)
 
 
-#fully optimized with all warnings including ISOC/C++ and stops forbidden exten-
-#-ions. Warns if multiple pointers to same address(aliasing). Debug included max
-#level
+#-D is macro define flag and g3 is highest debug inclusion level
+DEBUG_FLAGS = -D DEBUG -g3
 LFLAGS = 
+#max optimization with pedantic (ISOC/C++ and stops forbidden extensions)
+#and strict aliasing(pointers to same address warning)
 CFLAGS = -std=gnu11 -O3 -Wall -Wextra -Wpedantic -Wstrict-aliasing 
 CC = gcc
 CPP = gcc
 #CPPFLAGS ?= $(CLFAGS) -MMD -MP
+
+#INCLUDES
+LIB_FLAGS = #-l
+#gets list of directory names in src directory
+INC_DIRS :=$(shell find $(SRC_DIR) -type d)
+#Adds the -I flag to the INC_DIRS list so var is not so nested and = is not need
+INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 
 #EXECUTABLE RULES
@@ -61,18 +69,15 @@ $(BUILD_DIR)/$(TARGET_EXEC) : $(OBJS)
 
 #DEPENDENCY RULES
 
-# c build and src directory version. Puts .o files in src dir in build dir
-#$(BUILD_DIR)/%.c.o : %.c
-#	$(__MKDIR) $(dir $@)
-#	$(CC) $(CFLAGS) -c $< -o $@
-
-#*****TO DO******
-#problem with puting into object directory vs src directory
-$(BUILD_DIR)/objects/%.c.o : %.c
-#the makes directory named for directory each file came from. For multiple 
-#target executables.
-	$(__MKDIR) ./build/objects
-	$(CC) $(CFLAGS) -c $< -o $@
+# Original version. Works by being called first as a dependency so mkdir macro
+# will run pulling directory name/path from 'dir' command. Then by using $@ the
+# path of the src file is included in the -o build flag retaining src structure.
+# This path is also necessary for target build as we can use $^ or $(OBJS) which
+# will include the path dynamically than statically if we were to rename the dir
+# to 'objects' instead of src.
+$(BUILD_DIR)/%.c.o : %.c
+	$(__MKDIR) $(dir $@)
+	$(CC) $(CFLAGS) $(LIB_FLAGS) -c $< -o $@
 
 #assembly version
 #$(BUILD_DIR)/%.a.o : %.s
@@ -99,4 +104,4 @@ $(BUILD_DIR)/objects/%.c.o : %.c
 
 #@ symbol is used at beginning of recipe to not print execution
 clean:
-	@rm -rf *.o
+	@rm build -r
