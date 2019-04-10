@@ -1,4 +1,4 @@
-#Generic Makefile for c compilation with explanations
+#Makefile with Unity testing on build
 
 #MAKEFILE BASE SETUP
 
@@ -20,75 +20,44 @@ ifdef DEBUG
 	CFLAGS += $(DEBUG_FLAGS)
 endif
 
-ifeq ($(TEST) , unity)
-	CLEANUP=rm -f
-	MKDIR = -p
-	TARGET_EXTENSION = out
-	PATHU = Unity/src/
-	PATHS = src/
-	PATHT = test/
-	PATHB = build/
-	PATHD = build/depends/
-	PATHO = build/objs/
-	PATHR = build/results/
-	
-	BUILD_PATHS = $(PATHB) $(PATHD) $(PATHO) $(PATHR)
-	SRCT = $(wildcard $(PATHT)*.c)
+#UNITY TEST PATHS
 
-	TEST_COMPILE = gcc -c
-	TEST_LINK = gcc
-	TEST_DEPEND = gcc -MM _MG -MF
-	TEST_CFLAGS = -I. -I$(PATHU) -I$(PATHS) -DTEST
+CLEANUP=rm -f
+MKDIR = -p
+TARGET_EXTENSION = out
+PATHU = Unity/src/
+PATHS = src/
+PATHT = test/
+PATHB = build/
+PATHD = build/depends/
+PATHO = build/objs/
+PATHR = build/results/
 
-	RESULTS = $(patsubst $(PATHT)Test%.c,$(PATHR)Test%.txt,$(SCRT) )
+BUILD_PATHS = $(PATHB) $(PATHD) $(PATHO) $(PATHR)
+#$(wildcard pattern...) expansion function that replaces self with a space
+#seperated list of filenames fitting pattern dir/*.c is all .c files in dir.
+SRCT = $(wildcard $(PATHT)*.c)
 
-	PASSED = 'grep -s PASS $(PATHR)*.txt'
-	FAIL = 'grep -s FAIL $(PATHR)*.txt'
-	IGNORE = 'grep -s IGNORE $(PATHR)*.txt'
+TEST_COMPILE = gcc -c
+TEST_LINK = gcc
+#MM tells gcc to ouput header dependencies for compile files if they are in 
+#single quotes and aren't system headers. MG tells gcc to ignore when it can't
+#find headers since TEST_COMPILE doesn't show included paths to gcc. MF tells
+#gcc that header dependencies are to be written to a file with the next argument
+#being the name of the file to write.**Dependency file should be first rule so
+#it exists to be written to.
+TEST_DEPEND = gcc -MM -MG -MF
+#simple flags includes immediate dir, unity and source dir and defines "TEST"
+#for code to use if special to testing framework.
+TEST_CFLAGS = -I. -I$(PATHU) -I$(PATHS) -DTEST
 
-	test: $(BUILD_PATHS) $(RESULTS)
-		@echo "-----------------------\nIGNORES:\n----------------------"
-		@echo "$(IGNORE)"
-		@echo "-----------------------\nFAILURES:\n----------------------"
-		@echo "$(FAIL)"
-		@echo "-----------------------\nPASSED:\n----------------------"
-		@echo "$(PASSED)"
+RESULTS = $(patsubst $(PATHT)Test%.c,$(PATHR)Test%.txt,$(SCRT) )
 
-	$(PATHR)%.txt : $(PATHB)%.$(TARGET_EXTENSION)
-		-./$< > $@ 2>&1
-	$(PATHB)Test%.$(TARGET_EXTENSION): $(PATHO)Test%.o $(PATHO)%.o $(PATHU)unity.o #$(PATHD)Test%.d
-		$(LINK) -o $@ $^
-
-	$(PATHO)%.o :: $(PATHT)%.c
-		$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
-
-	$(PATHO)%.o :: $(PATHS)%.c
-		$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
-
-	$(PATHO)%.o :: $(PATHU)%.c $(PATHU)%.h
-		$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
-
-	$(PATHD)%.d :: $(PATHT)%.c
-		$(TEST_DEPEND) $@ $<
-
-	$(PATHB) :
-		$(MKDIR) $(PATHB)
-	$(PATHD) :
-		$(MKDIR) $(PATHD)
-	$(PATHO) :
-		$(MKDIR) $(PATHO)
-	$(PATHR) :
-		$(MKDIR) $(PATHR)
+PASSED = 'grep -s PASS $(PATHR)*.txt'
+FAIL = 'grep -s FAIL $(PATHR)*.txt'
+IGNORE = 'grep -s IGNORE $(PATHR)*.txt'
 
 
-
-
-
-else ifeq ($(TEST) , cpputest)
-	CPPUTEST = call
-else
-
-endif
 
 #VARIABLES
 
@@ -122,8 +91,6 @@ LFLAGS =
 #and strict aliasing(pointers to same address warning)
 CFLAGS += -std=gnu11 -O3 -Wall -Wextra -Wpedantic -Wstrict-aliasing 
 CC = gcc
-CPP = gcc
-#CPPFLAGS ?= $(CLFAGS) -MMD -MP
 
 #INCLUDES
 LIB_FLAGS = #-l
@@ -134,7 +101,7 @@ INC_FLAGS := $(addprefix -I,$(INC_DIRS))
 
 
 #EXECUTABLE RULES
-#remembr the .o file rule below will not compile if there isn't a call for it 
+#remember the .o file rule below will not compile if there isn't a call for it 
 #in the prereqs of another rule. Same with all % pattern rules.
 
 #puts target in build directory
@@ -154,41 +121,63 @@ $(BUILD_DIR)/%.c.o : %.c
 	$(__MKDIR) $(dir $@)
 	$(CC) $(CFLAGS) $(LIB_FLAGS) -c $< -o $@
 
-#assembly version
-#$(BUILD_DIR)/%.a.o : %.s
-#	$(__MKDIR) $(dir $@)
-#	$(AS) $(ASFLAGS) -c $< -o $@
 
-#cpp version
-#$(BUILD_DIR)/%.cpp.o : %.cpp
-#	$(__MKDIR) $(dir $@)
-#	$(CPP) $(CPPFLAGS) -c $< -o $@
+#UNITY RULES
+test: $(BUILD_PATHS) $(RESULTS)
+	@echo "-----------------------\nIGNORES:\n----------------------"
+	@echo "$(IGNORE)"
+	@echo "-----------------------\nFAILURES:\n----------------------"
+	@echo "$(FAIL)"
+	@echo "-----------------------\nPASSED:\n----------------------"
+	@echo "$(PASSED)"
 
+$(PATHR)%.txt : $(PATHB)%.$(TARGET_EXTENSION)
+	-./$< > $@ 2>&1
+$(PATHB)Test%.$(TARGET_EXTENSION): $(PATHO)Test%.o $(PATHO)%.o $(PATHU)unity.o #$(PATHD)Test%.d
+	$(LINK) -o $@ $^
 
-#generic version
-#Rule below compiles all .c files to .o files, -c compiles and does not link(ma
-#kes .o files) -o for named file output
-#$@ is target of rule (target is left of : and right is prereqs for that target
-# % is pattern rule prereq (finds all matching following pattern), $<name of 
-#first prereq, $^ names of all prereq with spaces between.
+$(PATHO)%.o :: $(PATHT)%.c
+	$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
 
-#%*.o : %*.c
-#	$(CC) $< -o $@ $(CFLAGS)
+$(PATHO)%.o :: $(PATHS)%.c
+	$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
+
+$(PATHO)%.o :: $(PATHU)%.c $(PATHU)%.h
+	$(TEST_COMPILE) $(TEST_CFLAGS) $< -o $@
+
+$(PATHD)%.d :: $(PATHT)%.c
+	$(TEST_DEPEND) $@ $<
+
+#Creates build dir automatically
+$(PATHB) :
+	$(MKDIR) $(PATHB)
+$(PATHD) :
+	$(MKDIR) $(PATHD)
+$(PATHO) :
+	$(MKDIR) $(PATHO)
+$(PATHR) :
+	$(MKDIR) $(PATHR)
 
 #OTHER RULES
 
 #@ symbol is used at beginning of recipe to not print execution
 clean:
-	ifeq ($(TEST) , unity)
-		$(CLEANUP) $(PATHO)*.o
-		$(CLEANUP) $(PATHB)*.$(TARGET_EXTENSTION)
-		$(CLEANUP) $(PATHR)*.txt
-	endif
-	@rm build -r
+	$(CLEANUP) $(PATHO)*.o
+	$(CLEANUP) $(PATHB)*.$(TARGET_EXTENSTION)
+	$(CLEANUP) $(PATHR)*.txt
 
-ifeq ($(TEST) , unity)
-	.PRECIOUS: $(PATHB)Test%.$(TARGET_EXTENSION)
-	.PRECIOUS: $(PATHD)%.d
-	.PRECIOUS: $(PATHO)%.o
-	.PRECIOUS: $(PATHR)%.txt
-endif
+#SPECIAL TARGETS
+
+#".PRECIOUS" is a special target which prevents deletion of target if their 
+#recipe is killed or interrupted and if target is an intermediate file it will
+#not be deleted after it's no longer needed.
+.PRECIOUS: $(PATHB)Test%.$(TARGET_EXTENSION)
+.PRECIOUS: $(PATHD)%.d
+.PRECIOUS: $(PATHO)%.o
+.PRECIOUS: $(PATHR)%.txt
+
+#".PHONY" is target created to indicate to make that this is not a real target
+#.PHONY : clean will not run if a file named clean exists so "make clean" will
+#think it's up to date and not run .PHONY allows it to be run regardless.
+.PHONY : clean
+.PHONY : test
